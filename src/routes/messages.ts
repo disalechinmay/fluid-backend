@@ -1,7 +1,8 @@
 import express from 'express';
 import { BAD_REQ_RESPONSE } from '../constants';
 import ApplicationPrismaClient from '../utils/db';
-import { findEmailFromUid } from '../utils/users';
+import { findUserFromUid } from '../utils/users';
+import { saveMessage } from '../utils/messages';
 
 export const router = express.Router();
 
@@ -14,17 +15,20 @@ router.get('/:chatId', async (req, res) => {
     },
   });
 
-  interface ParticipantsIdToEmailMap {
+  interface StringToStringMap {
     [key: string]: string;
   }
-  let participantsIdToEmailMap: ParticipantsIdToEmailMap = {};
+  let participantsIdToEmailMap: StringToStringMap = {};
+  let participantsIdToPictureMap: StringToStringMap = {};
 
   let transformedMessages = [] as any[];
   for (let message of messages) {
+    let user = await findUserFromUid(message.senderId);
     if (!participantsIdToEmailMap.hasOwnProperty(message.senderId)) {
-      participantsIdToEmailMap[message.senderId] = (await findEmailFromUid(
-        message.senderId
-      )) as string;
+      participantsIdToEmailMap[message.senderId] = user?.email as string;
+    }
+    if (!participantsIdToPictureMap.hasOwnProperty(message.senderId)) {
+      participantsIdToPictureMap[message.senderId] = user?.pictureUrl as string;
     }
 
     transformedMessages.push({
@@ -32,6 +36,7 @@ router.get('/:chatId', async (req, res) => {
       sender: {
         uid: message.senderId,
         email: participantsIdToEmailMap[message.senderId],
+        picture: participantsIdToPictureMap[message.senderId],
       },
       text: message.text,
       timestamp: message.date as Date,
@@ -46,13 +51,12 @@ router.post('/:chatId', async (req, res) => {
   if (!req.body.senderId || !req.body.text)
     return res.status(400).send(BAD_REQ_RESPONSE);
 
-  const message = await ApplicationPrismaClient.message.create({
-    data: {
-      chatId: req.params.chatId,
-      senderId: req.body.senderId,
-      text: req.body.text,
-    },
-  });
+  let message = saveMessage(
+    req.params.chatId,
+    req.body.senderId,
+    req.body.text,
+    new Date()
+  );
 
   res.json(message);
 });

@@ -13,6 +13,7 @@ datasource db {
 model User {
   uid         String      @id
   email       String      @unique
+  pictureUrl  String      @default("")
   chats       BigInt[]    @default([])
 
   @@map("fl_user")

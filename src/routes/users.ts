@@ -1,13 +1,13 @@
 import express from 'express';
 import { BAD_REQ_RESPONSE } from '../constants';
 import ApplicationPrismaClient from '../utils/db';
-import { findEmailFromUid } from '../utils/users';
+import { findUserFromUid } from '../utils/users';
 
 export const router = express.Router();
 
 router.post('/:id', async (req, res) => {
   if (!req.params.id) return res.status(400).send(BAD_REQ_RESPONSE);
-  if (!req.body.uid || !req.body.email)
+  if (!req.body.uid || !req.body.email || !req.body.picture)
     return res.status(400).send(BAD_REQ_RESPONSE);
 
   let user = await ApplicationPrismaClient.user.findUnique({
@@ -21,8 +21,21 @@ router.post('/:id', async (req, res) => {
       data: {
         uid: req.body.uid,
         email: req.body.email,
+        pictureUrl: req.body.picture,
       },
     });
+  } else {
+    // Check if pictureUrl needs to be updated
+    if (user.pictureUrl !== req.body.picture) {
+      user = await ApplicationPrismaClient.user.update({
+        where: {
+          uid: req.params.id,
+        },
+        data: {
+          pictureUrl: req.body.picture,
+        },
+      });
+    }
   }
 
   // Find all chats whose IDs are present in user.chats
@@ -42,9 +55,11 @@ router.post('/:id', async (req, res) => {
     let resolvedParticipants = [];
     for (let j = 0; j < chat.participants.length; j++) {
       let p = chat.participants[j] as string;
+      let user = await findUserFromUid(p);
       resolvedParticipants.push({
         uid: p,
-        email: await findEmailFromUid(p as string),
+        email: user?.email,
+        picture: user?.pictureUrl,
       });
     }
     transformedChats.push({
@@ -61,25 +76,27 @@ router.post('/:id', async (req, res) => {
   return res.json(transformedUser);
 });
 
-// router.get('/search/:searchQuery', async (req, res) => {
-//   if (!req.params.searchQuery) return res.status(400).send(BAD_REQ_RESPONSE);
+router.get('/search/:searchQuery', async (req, res) => {
+  if (!req.params.searchQuery) return res.status(400).send(BAD_REQ_RESPONSE);
 
-//   const users = await ApplicationPrismaClient.user.findMany({
-//     where: {
-//       email: {
-//         contains: req.params.searchQuery,
-//       },
-//     },
-//     include: {
-//       loansGiven: false,
-//       loansTaken: false,
-//     },
-//     take: 10,
-//   });
+  const users = await ApplicationPrismaClient.user.findMany({
+    where: {
+      email: {
+        contains: req.params.searchQuery,
+      },
+    },
+    select: {
+      uid: true,
+      email: true,
+      pictureUrl: true,
+      chats: false,
+    },
+    take: 10,
+  });
 
-//   // Remove user if they are the same as the current user
-//   const filteredUsers = users.filter(
-//     (user) => user.uid !== req?.auth?.payload?.sub?.toString()
-//   );
-//   return res.json(filteredUsers);
-// });
+  // Remove user if they are the same as the current user
+  const filteredUsers = users.filter(
+    (user) => user.uid !== req?.auth?.payload?.sub?.toString()
+  );
+  return res.json(filteredUsers);
+});
