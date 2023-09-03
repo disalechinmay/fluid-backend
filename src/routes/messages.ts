@@ -6,14 +6,40 @@ import { saveMessage } from '../utils/messages';
 
 export const router = express.Router();
 
-router.get('/:chatId', async (req, res) => {
-  if (!req.params.chatId) return res.status(400).send(BAD_REQ_RESPONSE);
+router.get('/:chatId/:last', async (req, res) => {
+  if (!req.params.chatId || !req.params.last)
+    return res.status(400).send(BAD_REQ_RESPONSE);
 
-  const messages = await ApplicationPrismaClient.message.findMany({
-    where: {
-      chatId: req.params.chatId,
-    },
-  });
+  // Find last 50 messages in chat
+  let messages = null;
+  if (req.params.last === 'latest') {
+    messages = await ApplicationPrismaClient.message.findMany({
+      where: {
+        chatId: req.params.chatId,
+      },
+      orderBy: {
+        date: 'desc',
+      },
+      take: 5,
+    });
+  } else {
+    // Find the next 50 messages in chat
+    messages = await ApplicationPrismaClient.message.findMany({
+      where: {
+        chatId: req.params.chatId,
+        date: {
+          lt: new Date(req.params.last),
+        },
+      },
+      orderBy: {
+        date: 'desc',
+      },
+      take: 5,
+    });
+  }
+
+  // Reverse messages
+  messages.reverse();
 
   interface StringToStringMap {
     [key: string]: string;

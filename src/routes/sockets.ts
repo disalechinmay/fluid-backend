@@ -7,11 +7,6 @@ export const socketHandler = (
   socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>,
   io: any
 ) => {
-  console.log('socket connected', socket.id);
-  socket.on('disconnect', () => {
-    console.log('socket disconnected', socket.id);
-  });
-
   socket.on('msg', (data: IBroadcastMessage) => {
     io.sockets.emit('brdcst-' + data.chatId, data);
     saveMessage(data.chatId, data.senderId, data.text, data.timestamp);

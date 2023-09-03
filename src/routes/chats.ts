@@ -5,8 +5,6 @@ import ApplicationPrismaClient from '../utils/db';
 export const router = express.Router();
 
 router.post('/', async (req, res) => {
-  console.log('Inside post');
-  console.log(req.body);
   if (!req.body.uid) {
     return res.status(400).send(BAD_REQ_RESPONSE);
   }
